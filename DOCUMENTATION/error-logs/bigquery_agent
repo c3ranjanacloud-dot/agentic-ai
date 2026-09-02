@@ -1,0 +1,306 @@
+# Google ADK BigQuery Agent – Error Documentation
+
+## 1. ImportError: `dataplex_v1` could not be imported
+
+### Error
+
+```text
+ImportError: Fail to load 'bigquery_agent' module.
+cannot import name 'dataplex_v1' from 'google.cloud' (unknown location)
+```
+
+### Location
+
+The error occurred while loading:
+
+```text
+google.adk.tools.bigquery
+    ↓
+google.adk.integrations.bigquery
+    ↓
+client.py
+    ↓
+from google.cloud import dataplex_v1
+```
+
+### Root Cause
+
+The Google ADK BigQuery integration requires the Google Cloud Dataplex Python client, but the required package was missing or not correctly installed in the Python environment.
+
+### Resolution
+
+Install/update the Dataplex client package:
+
+```bash
+python3 -m pip install -U google-cloud-dataplex
+```
+
+Verify the installation:
+
+```bash
+python3 -c "from google.cloud import dataplex_v1; print('Dataplex import OK')"
+```
+
+Expected output:
+
+```text
+Dataplex import OK
+```
+
+### Verification
+
+After installing the dependency, verify that the BigQuery toolset can be imported:
+
+```bash
+python3 -c "from google.adk.tools.bigquery import BigQueryToolset; print('BigQueryToolset import OK')"
+```
+
+---
+
+## 2. NameError: `google` is not defined
+
+### Error
+
+```text
+NameError: Fail to load 'bigquery_agent' module.
+name 'google' is not defined
+```
+
+### Location
+
+The error occurred at:
+
+```python
+application_default_credentials, _ = google.auth.default()
+```
+
+### Root Cause
+
+The `google` package/module was referenced in the Python code without importing `google.auth`.
+
+### Resolution
+
+Add the required import:
+
+```python
+import google.auth
+```
+
+Then:
+
+```python
+application_default_credentials, _ = google.auth.default()
+```
+
+Alternatively, import the `default` function directly:
+
+```python
+from google.auth import default
+
+application_default_credentials, _ = default()
+```
+
+### Recommended Approach
+
+Use:
+
+```python
+import google.auth
+
+application_default_credentials, _ = google.auth.default()
+```
+
+This makes it explicit that Google authentication is being used.
+
+---
+
+## 3. TypeError: Invalid `tool_config` argument
+
+### Error
+
+```text
+TypeError: Fail to load 'bigquery_agent' module.
+BigQueryToolset.__init__() got an unexpected keyword argument 'tool_config'
+```
+
+### Root Cause
+
+The code was using an incorrect constructor parameter for the installed Google ADK version.
+
+Installed ADK version:
+
+```text
+google-adk 2.6.2
+```
+
+The `BigQueryToolset` constructor in this version accepts:
+
+```text
+tool_filter
+credentials_config
+bigquery_tool_config
+```
+
+It does **not** accept:
+
+```text
+tool_config
+```
+
+### Resolution
+
+Change:
+
+```python
+bigquery_toolset = BigQueryToolset(
+    credentials_config=credentials_config,
+    tool_config=tool_config
+)
+```
+
+to:
+
+```python
+bigquery_toolset = BigQueryToolset(
+    credentials_config=credentials_config,
+    bigquery_tool_config=tool_config
+)
+```
+
+### Verification
+
+The constructor signature was verified using:
+
+```bash
+python3 -c "from google.adk.tools.bigquery import BigQueryToolset; import inspect; print(inspect.signature(BigQueryToolset.__init__))"
+```
+
+The installed version returned:
+
+```text
+(self, *,
+ tool_filter: Optional[Union[ToolPredicate, List[str]]] = None,
+ credentials_config: Optional[BigQueryCredentialsConfig] = None,
+ bigquery_tool_config: Optional[BigQueryToolConfig] = None
+)
+```
+
+Therefore:
+
+```text
+tool_config
+```
+
+must be replaced with:
+
+```text
+bigquery_tool_config
+```
+
+---
+
+## 4. Deprecation Warning: `google.adk.tools.bigquery`
+
+### Warning
+
+```text
+DeprecationWarning:
+google.adk.tools.bigquery is deprecated,
+use google.adk.integrations.bigquery instead
+```
+
+### Root Cause
+
+The code imports `BigQueryToolset` from the older/deprecated ADK module:
+
+```python
+from google.adk.tools.bigquery import BigQueryToolset
+```
+
+### Resolution
+
+Use the current integration module:
+
+```python
+from google.adk.integrations.bigquery import BigQueryToolset
+```
+
+### Recommended Change
+
+Change:
+
+```python
+from google.adk.tools.bigquery import BigQueryToolset
+```
+
+to:
+
+```python
+from google.adk.integrations.bigquery import BigQueryToolset
+```
+
+This removes the deprecation warning and aligns the code with the current ADK integration structure.
+
+---
+
+# Summary of Issues and Resolutions
+
+| # | Error/Warning                               | Root Cause                          | Resolution                             |
+| - | ------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| 1 | `cannot import name 'dataplex_v1'`          | Dataplex dependency unavailable     | Install `google-cloud-dataplex`        |
+| 2 | `name 'google' is not defined`              | Missing `google.auth` import        | Add `import google.auth`               |
+| 3 | `unexpected keyword argument 'tool_config'` | Incorrect ADK constructor parameter | Use `bigquery_tool_config`             |
+| 4 | `google.adk.tools.bigquery is deprecated`   | Deprecated import path              | Use `google.adk.integrations.bigquery` |
+
+## Environment
+
+```text
+Python: 3.12
+Google ADK: 2.6.2
+```
+
+## Final Recommended Import
+
+```python
+import google.auth
+
+from google.adk.agents import Agent
+from google.adk.integrations.bigquery import BigQueryToolset
+```
+
+## Final BigQueryToolset Configuration
+
+```python
+application_default_credentials, _ = google.auth.default()
+
+bigquery_toolset = BigQueryToolset(
+    credentials_config=credentials_config,
+    bigquery_tool_config=tool_config
+)
+```
+
+## Useful Validation Commands
+
+Check ADK version:
+
+```bash
+pip show google-adk
+```
+
+Check Dataplex:
+
+```bash
+python3 -c "from google.cloud import dataplex_v1; print('Dataplex import OK')"
+```
+
+Check BigQuery Toolset:
+
+```bash
+python3 -c "from google.adk.integrations.bigquery import BigQueryToolset; print('BigQueryToolset import OK')"
+```
+
+Check the installed constructor:
+
+```bash
+python3 -c "from google.adk.integrations.bigquery import BigQueryToolset; import inspect; print(inspect.signature(BigQueryToolset.__init__))"
+```
